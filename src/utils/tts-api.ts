@@ -1,9 +1,3 @@
-import { TTSApiRequest, TTSApiResponse } from '@/types';
-
-const HF_SPACE_URL = process.env.NEXT_PUBLIC_HF_SPACE_URL;
-const HF_API_NAME = process.env.NEXT_PUBLIC_HF_API_NAME;
-const HF_TOKEN = process.env.HF_TOKEN;
-
 interface GenerateVoiceOptions {
   text: string;
   referenceAudioBase64: string;
@@ -20,10 +14,6 @@ export async function generateVoice({
   text,
   referenceAudioBase64,
 }: GenerateVoiceOptions): Promise<Blob> {
-  if (!HF_SPACE_URL || !HF_API_NAME || !HF_TOKEN) {
-    throw new TTSApiError('TTS API 配置不完整');
-  }
-
   if (!text.trim()) {
     throw new TTSApiError('请输入要生成的文本');
   }
@@ -33,46 +23,22 @@ export async function generateVoice({
   }
 
   try {
-    const apiUrl = `${HF_SPACE_URL}${HF_API_NAME}`;
-    
-    const requestBody: TTSApiRequest = {
-      inputs: {
-        reference_audio: referenceAudioBase64,
-        text: text.trim(),
-      },
-    };
-
-    const response = await fetch(apiUrl, {
+    const response = await fetch('/api/tts', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${HF_TOKEN}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        text: text.trim(),
+        referenceAudioBase64,
+      }),
     });
 
+    const result = await response.json();
+
     if (!response.ok) {
-      let errorMessage = '语音生成失败';
-      
-      switch (response.status) {
-        case 401:
-          errorMessage = 'API 认证失败，请检查令牌';
-          break;
-        case 429:
-          errorMessage = 'API 调用频率过高，请稍后重试';
-          break;
-        case 500:
-          errorMessage = '服务器内部错误';
-          break;
-        case 503:
-          errorMessage = 'TTS 服务暂时不可用';
-          break;
-      }
-
-      throw new TTSApiError(errorMessage, response.status);
+      throw new TTSApiError(result.error || '语音生成失败', response.status);
     }
-
-    const result: TTSApiResponse = await response.json();
     
     if (!result.audio) {
       throw new TTSApiError('API 返回的音频数据为空');
