@@ -8,6 +8,14 @@ const HF_TOKEN = process.env.HF_TOKEN;
 export async function POST(request: NextRequest) {
   try {
     // 验证环境变量
+    console.log('环境变量调试信息:', {
+      HF_SPACE_URL: HF_SPACE_URL || 'undefined',
+      HF_API_NAME: HF_API_NAME || 'undefined', 
+      HF_TOKEN: HF_TOKEN ? `${HF_TOKEN.substring(0, 10)}...` : 'undefined',
+      NODE_ENV: process.env.NODE_ENV,
+      VERCEL: process.env.VERCEL
+    });
+    
     if (!HF_SPACE_URL || !HF_API_NAME || !HF_TOKEN) {
       console.error('TTS API 配置不完整:', { 
         hasUrl: !!HF_SPACE_URL, 
@@ -15,7 +23,14 @@ export async function POST(request: NextRequest) {
         hasToken: !!HF_TOKEN 
       });
       return NextResponse.json(
-        { error: 'TTS API 配置不完整' },
+        { 
+          error: 'TTS API 配置不完整', 
+          debug: {
+            HF_SPACE_URL: HF_SPACE_URL || 'missing',
+            HF_API_NAME: HF_API_NAME || 'missing',
+            HF_TOKEN: HF_TOKEN ? 'present' : 'missing'
+          }
+        },
         { status: 500 }
       );
     }
