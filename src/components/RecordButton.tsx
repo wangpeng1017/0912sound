@@ -10,6 +10,7 @@ interface RecordButtonProps {
   onStop: () => void;
   maxDuration?: number;
   className?: string;
+  isProcessing?: boolean;
 }
 
 export const RecordButton: React.FC<RecordButtonProps> = ({
@@ -19,6 +20,7 @@ export const RecordButton: React.FC<RecordButtonProps> = ({
   onStop,
   maxDuration = 15,
   className = '',
+  isProcessing = false,
 }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isDone, setIsDone] = useState(false);
@@ -96,7 +98,7 @@ export const RecordButton: React.FC<RecordButtonProps> = ({
     <button
       onClick={handleClick}
       className={`flex items-center justify-center px-4 py-2 text-white rounded-lg transition-colors ${getButtonColor()} ${className}`}
-      disabled={status === RecordingStatus.PROCESSING}
+      disabled={isProcessing}
     >
       {getButtonIcon()}
       <span>{getButtonText()}</span>

@@ -105,7 +105,7 @@ export async function generateVoice({
 // 音频格式转换工具函数
 export async function convertAudioToWav(audioBlob: Blob): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     const fileReader = new FileReader();
     
     fileReader.onload = async (e) => {
@@ -118,7 +118,7 @@ export async function convertAudioToWav(audioBlob: Blob): Promise<Blob> {
         const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' });
         
         resolve(wavBlob);
-      } catch (error) {
+      } catch {
         reject(new Error('音频格式转换失败'));
       }
     };

@@ -4,7 +4,6 @@ import { useState, useCallback } from 'react';
 import { RecordButton } from './RecordButton';
 import { AudioPlayer } from './AudioPlayer';
 import { useRecorder } from '@/hooks/useRecorder';
-import { RecordingStatus } from '@/types';
 import { generateVoice, TTSApiError } from '@/utils/tts-api';
 
 export const VoiceCloner: React.FC = () => {
@@ -14,7 +13,6 @@ export const VoiceCloner: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   
   const {
-    isRecording,
     recordedBlob,
     duration,
     error: recordError,
@@ -124,6 +122,7 @@ export const VoiceCloner: React.FC = () => {
               onStop={stopRecording}
               maxDuration={15}
               className="w-full sm:w-auto"
+              isProcessing={isGenerating}
             />
           </div>
           

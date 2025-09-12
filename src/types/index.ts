@@ -20,6 +20,7 @@ export interface TTSApiResponse {
 export enum RecordingStatus {
   IDLE = 'idle',
   RECORDING = 'recording', 
+  PROCESSING = 'processing',
   COMPLETED = 'completed',
   ERROR = 'error'
 }
