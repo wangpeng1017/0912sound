@@ -215,14 +215,17 @@ export async function POST(request: NextRequest) {
       console.log('调用 Gradio API:', gradioApiUrl);
       console.log('参数:', { textLength: text.length, audioLength: referenceAudioBase64.length });
       
-      // 根据截图显示的cURL命令，使用FileData格式
+      // 使用与官方完全相同的格式
       const requestData = {
         data: [
-          // ref_audio - 使用官方FileData格式（直接data URL）
-          `data:audio/wav;base64,${referenceAudioBase64}`,
+          // ref_audio - 使用FileData对象格式
+          {
+            "path": `data:audio/wav;base64,${referenceAudioBase64}`,
+            "meta": {"_type": "gradio.FileData"}
+          },
           text.trim(), // ref_text
           text.trim(), // gen_text 
-          true // remove_silence - 按照官方示例设置为true
+          true // remove_silence
         ]
       };
       
@@ -244,11 +247,14 @@ export async function POST(request: NextRequest) {
         
         const fileRequestData = {
           data: [
-            // ref_audio - 使用官方的简单格式
-            `data:audio/wav;base64,${referenceAudioBase64}`,
+            // ref_audio - 使用FileData对象格式（备用）
+            {
+              "path": `data:audio/wav;base64,${referenceAudioBase64}`,
+              "meta": {"_type": "gradio.FileData"}
+            },
             text.trim(), // ref_text
             text.trim(), // gen_text 
-            true // remove_silence - 修改为true以匹配官方示例
+            true // remove_silence
           ]
         };
         
