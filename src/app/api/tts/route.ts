@@ -46,18 +46,25 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // 根据 Gradio 官方文档，正确的 API 端点格式是 /call/predict
+      // 根据官方API文档，使用正确的gradio_client格式
+      // API端点是 /api/predict，但HTTP调用时需要使用 /call/predict
       const gradioApiUrl = `${HF_SPACE_URL}/call/predict`;
       
       console.log('调用 Gradio API:', gradioApiUrl);
       console.log('参数:', { textLength: text.length, audioLength: referenceAudioBase64.length });
       
-      // 根据 Gradio 文档的正确格式
+      // 根据官方文档，参数顺序为：ref_audio, ref_text, gen_text, remove_silence
       const requestData = {
         data: [
-          // reference_audio - 文件数据格式
-          `data:audio/wav;base64,${referenceAudioBase64}`,
-          text.trim(), // reference_text
+          // ref_audio - 使用file格式
+          {
+            "path": `audio_${Date.now()}.wav`,
+            "url": `data:audio/wav;base64,${referenceAudioBase64}`,
+            "orig_name": "reference_audio.wav",
+            "size": Math.floor(referenceAudioBase64.length * 0.75),
+            "mime_type": "audio/wav"
+          },
+          text.trim(), // ref_text
           text.trim(), // gen_text 
           false // remove_silence
         ]
