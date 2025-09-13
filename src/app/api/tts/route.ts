@@ -46,14 +46,13 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // 根据 Gradio 文档，需要使用正确的 API 端点
-      // Gradio Space 的 API 端点通常在 '/run/predict' 或特定的函数名
-      const gradioApiUrl = `${HF_SPACE_URL}/run/predict`;
+      // 根据 Gradio 官方文档，正确的 API 端点格式是 /call/predict
+      const gradioApiUrl = `${HF_SPACE_URL}/call/predict`;
       
       console.log('调用 Gradio API:', gradioApiUrl);
       console.log('参数:', { textLength: text.length, audioLength: referenceAudioBase64.length });
       
-      // 尝试第一种格式：直接提交到 /run/predict
+      // 根据 Gradio 文档的正确格式
       const requestData = {
         data: [
           // reference_audio - 文件数据格式
@@ -86,8 +85,8 @@ export async function POST(request: NextRequest) {
           console.log('尝试备用 API 端点');
           // 尝试不同的端点格式
           const altEndpoints = [
-            `${HF_SPACE_URL}/api/predict`,
-            `${HF_SPACE_URL}/call/predict`, 
+            `${HF_SPACE_URL}/run/predict`,
+            `${HF_SPACE_URL}/api/predict`, 
             `${HF_SPACE_URL}/gradio_api/run/predict`
           ];
           
@@ -180,7 +179,77 @@ export async function POST(request: NextRequest) {
       
       console.log('Gradio API 成功响应:', result);
       
-      // Gradio 返回格式通常是 { data: [...] }
+      // Gradio 异步 API 返回 event_id
+      if (result.event_id) {
+        console.log('收到 event_id:', result.event_id);
+        
+        // 轮询结果
+        const eventUrl = `${HF_SPACE_URL}/call/predict/${result.event_id}`;
+        const maxRetries = 30; // 最多等待 30 秒
+        
+        for (let i = 0; i < maxRetries; i++) {
+          try {
+            console.log(`轮询结果 (${i + 1}/${maxRetries}):`, eventUrl);
+            
+            const eventResponse = await fetch(eventUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${HF_TOKEN}`,
+              },
+            });
+            
+            if (!eventResponse.ok) {
+              console.log('轮询失败，继续等待:', eventResponse.status);
+              await new Promise(resolve => setTimeout(resolve, 1000)); // 等待 1 秒
+              continue;
+            }
+            
+            const eventData = await eventResponse.text();
+            console.log('轮询响应:', eventData);
+            
+            // 检查是否是成功的结果
+            if (eventData.includes('"msg":"process_completed"') || eventData.includes('data:')) {
+              // 解析结果
+              const lines = eventData.split('\n').filter(line => line.trim().startsWith('data:'));
+              
+              for (const line of lines) {
+                try {
+                  const jsonData = JSON.parse(line.replace('data: ', ''));
+                  
+                  if (jsonData.msg === 'process_completed' && jsonData.output && jsonData.output.data) {
+                    const audioResult = jsonData.output.data[0];
+                    
+                    if (typeof audioResult === 'string' && audioResult.startsWith('http')) {
+                      // 下载音频文件
+                      console.log('下载音频文件:', audioResult);
+                      const audioResponse = await fetch(audioResult);
+                      const audioBuffer = await audioResponse.arrayBuffer();
+                      const base64Audio = Buffer.from(audioBuffer).toString('base64');
+                      
+                      console.log('TTS API 调用成功，返回音频数据');
+                      return NextResponse.json({ audio: base64Audio });
+                    }
+                  }
+                } catch (lineParseError) {
+                  console.log('解析行数据失败:', lineParseError);
+                }
+              }
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 等待 1 秒
+          } catch (eventError) {
+            console.error('轮询事件失败:', eventError);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        
+        return NextResponse.json(
+          { error: '语音生成超时，请稍后重试' },
+          { status: 408 }
+        );
+      }
+      
+      // 兼容同步 API 格式
       if (result.data && result.data.length > 0) {
         const audioResult = result.data[0];
         
