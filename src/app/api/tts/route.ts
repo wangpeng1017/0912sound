@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     try {
       // 根据 Gradio 文档，需要使用正确的 API 端点
       // Gradio Space 的 API 端点通常在 '/run/predict' 或特定的函数名
-      let gradioApiUrl = `${HF_SPACE_URL}/run/predict`;
+      const gradioApiUrl = `${HF_SPACE_URL}/run/predict`;
       
       console.log('调用 Gradio API:', gradioApiUrl);
       console.log('参数:', { textLength: text.length, audioLength: referenceAudioBase64.length });
