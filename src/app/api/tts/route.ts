@@ -56,9 +56,9 @@ async function handleGradioResponse(responseText: string, spaceUrl: string, toke
           );
         }
         
-        // 检查是否是成功的结果
-        if (eventData.includes('"msg":"process_completed"') || eventData.includes('data:')) {
-          // 解析结果
+        // 检查是否有成功完成事件
+        if (eventData.includes('event: complete')) {
+          // 解析结果 - 官方格式
           const lines = eventData.split('\n').filter(line => line.trim().startsWith('data:'));
           
           for (const line of lines) {
@@ -71,14 +71,16 @@ async function handleGradioResponse(responseText: string, spaceUrl: string, toke
               }
               
               const jsonData = JSON.parse(dataContent);
+              console.log('解析成功的数据:', jsonData);
               
-              if (jsonData && jsonData.msg === 'process_completed' && jsonData.output && jsonData.output.data) {
-                const audioResult = jsonData.output.data[0];
+              // 官方格式: 返回数组，包含文件信息
+              if (Array.isArray(jsonData) && jsonData.length > 0) {
+                const audioResult = jsonData[0];
                 
-                if (typeof audioResult === 'string' && audioResult.startsWith('http')) {
+                if (audioResult && audioResult.url && audioResult.url.startsWith('http')) {
                   // 下载音频文件
-                  console.log('下载音频文件:', audioResult);
-                  const audioResponse = await fetch(audioResult);
+                  console.log('下载音频文件:', audioResult.url);
+                  const audioResponse = await fetch(audioResult.url);
                   const audioBuffer = await audioResponse.arrayBuffer();
                   const base64Audio = Buffer.from(audioBuffer).toString('base64');
                   
@@ -216,12 +218,8 @@ export async function POST(request: NextRequest) {
       // 根据截图显示的cURL命令，使用FileData格式
       const requestData = {
         data: [
-          // ref_audio - 使用FileData格式（WAV格式）
-          {
-            "path": "reference_audio.wav",
-            "meta": {"_type": "gradio.FileData"},
-            "url": `data:audio/wav;base64,${referenceAudioBase64}`
-          },
+          // ref_audio - 使用官方FileData格式（直接data URL）
+          `data:audio/wav;base64,${referenceAudioBase64}`,
           text.trim(), // ref_text
           text.trim(), // gen_text 
           true // remove_silence - 按照官方示例设置为true
@@ -246,14 +244,8 @@ export async function POST(request: NextRequest) {
         
         const fileRequestData = {
           data: [
-            // ref_audio - 使用文件对象格式（WAV格式）
-            {
-              "path": `audio_${Date.now()}.wav`,
-              "url": `data:audio/wav;base64,${referenceAudioBase64}`,
-              "orig_name": "reference_audio.wav",
-              "size": Math.floor(referenceAudioBase64.length * 0.75),
-              "mime_type": "audio/wav"
-            },
+            // ref_audio - 使用官方的简单格式
+            `data:audio/wav;base64,${referenceAudioBase64}`,
             text.trim(), // ref_text
             text.trim(), // gen_text 
             true // remove_silence - 修改为true以匹配官方示例
