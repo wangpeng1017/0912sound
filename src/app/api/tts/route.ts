@@ -157,6 +157,11 @@ export async function POST(request: NextRequest) {
       VERCEL: process.env.VERCEL
     });
     
+    // 根据官方文档，API名称应该是/predict
+    if (HF_API_NAME !== '/predict') {
+      console.warn('注意: HF_API_NAME 应该设置为 "/predict"，当前是:', HF_API_NAME);
+    }
+    
     if (!HF_SPACE_URL || !HF_API_NAME || !HF_TOKEN) {
       console.error('TTS API 配置不完整:', { 
         hasUrl: !!HF_SPACE_URL, 
@@ -219,7 +224,7 @@ export async function POST(request: NextRequest) {
           },
           text.trim(), // ref_text
           text.trim(), // gen_text 
-          true // remove_silence - 按照截图设置为true
+          true // remove_silence - 按照官方示例设置为true
         ]
       };
       
@@ -251,7 +256,7 @@ export async function POST(request: NextRequest) {
             },
             text.trim(), // ref_text
             text.trim(), // gen_text 
-            false // remove_silence
+            true // remove_silence - 修改为true以匹配官方示例
           ]
         };
         
