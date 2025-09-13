@@ -208,19 +208,40 @@ export async function POST(request: NextRequest) {
   }
 
     try {
-      // 根据Gradio JavaScript客户端文档，使用正确的API格式
-      // 首先尝试/gradio_api/call/predict端点
+      // 首先将音频上传到我们的服务器获取URL
+      const baseUrl = request.headers.get('origin') || 
+                      `https://${request.headers.get('host')}`;
+      
+      console.log('步骤1: 上传音频到临时存储');
+      const audioUploadResponse = await fetch(`${baseUrl}/api/audio`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioBase64: referenceAudioBase64 })
+      });
+      
+      if (!audioUploadResponse.ok) {
+        console.error('音频上传失败');
+        return NextResponse.json(
+          { error: '音频处理失败' },
+          { status: 500 }
+        );
+      }
+      
+      const { url: audioUrl } = await audioUploadResponse.json();
+      console.log('音频URL:', audioUrl);
+      
+      // 步骤2: 调用Gradio API
       const gradioApiUrl = `${HF_SPACE_URL}/gradio_api/call/predict`;
       
-      console.log('调用 Gradio API:', gradioApiUrl);
-      console.log('参数:', { textLength: text.length, audioLength: referenceAudioBase64.length });
+      console.log('步骤2: 调用 Gradio API:', gradioApiUrl);
+      console.log('参数:', { textLength: text.length, audioUrl });
       
-      // 使用与官方完全相同的格式
+      // 使用与官方完全相同的格式，但使用我们的URL
       const requestData = {
         data: [
-          // ref_audio - 使用FileData对象格式
+          // ref_audio - 使用FileData对象格式和HTTP URL
           {
-            "path": `data:audio/wav;base64,${referenceAudioBase64}`,
+            "path": audioUrl,
             "meta": {"_type": "gradio.FileData"}
           },
           text.trim(), // ref_text
