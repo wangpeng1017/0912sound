@@ -24,7 +24,7 @@ async function handleGradioResponse(responseText: string, spaceUrl: string, toke
     console.log('收到 event_id:', result.event_id);
     
     // 轮询结果
-    const eventUrl = `${spaceUrl}/call/predict/${result.event_id}`;
+    const eventUrl = `${spaceUrl}/gradio_api/call/predict/${result.event_id}`;
     const maxRetries = 30; // 最多等待 30 秒
     
     for (let i = 0; i < maxRetries; i++) {
@@ -186,20 +186,24 @@ export async function POST(request: NextRequest) {
 
     try {
       // 根据Gradio JavaScript客户端文档，使用正确的API格式
-      // 首先尝试/call/predict端点
-      const gradioApiUrl = `${HF_SPACE_URL}/call/predict`;
+      // 首先尝试/gradio_api/call/predict端点
+      const gradioApiUrl = `${HF_SPACE_URL}/gradio_api/call/predict`;
       
       console.log('调用 Gradio API:', gradioApiUrl);
       console.log('参数:', { textLength: text.length, audioLength: referenceAudioBase64.length });
       
-      // 根据 JavaScript 客户端示例，使用对象格式传参
+      // 根据截图显示的cURL命令，使用FileData格式
       const requestData = {
         data: [
-          // ref_audio - 尝试直接传递base64数据
-          `data:audio/wav;base64,${referenceAudioBase64}`,
+          // ref_audio - 使用FileData格式
+          {
+            "path": "reference_audio.wav",
+            "meta": {"_type": "gradio.FileData"},
+            "url": `data:audio/wav;base64,${referenceAudioBase64}`
+          },
           text.trim(), // ref_text
           text.trim(), // gen_text 
-          false // remove_silence
+          true // remove_silence - 按照截图设置为true
         ]
       };
       
