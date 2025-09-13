@@ -47,6 +47,15 @@ async function handleGradioResponse(responseText: string, spaceUrl: string, toke
         const eventData = await eventResponse.text();
         console.log('轮询响应:', eventData);
         
+        // 检查是否有错误
+        if (eventData.includes('event: error')) {
+          console.error('Gradio API 返回错误:', eventData);
+          return NextResponse.json(
+            { error: 'TTS 服务处理请求时出现错误，请检查音频格式或稍后重试' },
+            { status: 500 }
+          );
+        }
+        
         // 检查是否是成功的结果
         if (eventData.includes('"msg":"process_completed"') || eventData.includes('data:')) {
           // 解析结果
@@ -54,9 +63,16 @@ async function handleGradioResponse(responseText: string, spaceUrl: string, toke
           
           for (const line of lines) {
             try {
-              const jsonData = JSON.parse(line.replace('data: ', ''));
+              const dataContent = line.replace('data: ', '').trim();
               
-              if (jsonData.msg === 'process_completed' && jsonData.output && jsonData.output.data) {
+              // 跳过 null 或空数据
+              if (dataContent === 'null' || dataContent === '') {
+                continue;
+              }
+              
+              const jsonData = JSON.parse(dataContent);
+              
+              if (jsonData && jsonData.msg === 'process_completed' && jsonData.output && jsonData.output.data) {
                 const audioResult = jsonData.output.data[0];
                 
                 if (typeof audioResult === 'string' && audioResult.startsWith('http')) {
@@ -71,7 +87,7 @@ async function handleGradioResponse(responseText: string, spaceUrl: string, toke
                 }
               }
             } catch (lineParseError) {
-              console.log('解析行数据失败:', lineParseError);
+              console.log('解析行数据失败:', lineParseError, '原始数据:', line);
             }
           }
         }
@@ -195,11 +211,11 @@ export async function POST(request: NextRequest) {
       // 根据截图显示的cURL命令，使用FileData格式
       const requestData = {
         data: [
-          // ref_audio - 使用FileData格式
+          // ref_audio - 使用FileData格式（正确的WebM格式）
           {
-            "path": "reference_audio.wav",
+            "path": "reference_audio.webm",
             "meta": {"_type": "gradio.FileData"},
-            "url": `data:audio/wav;base64,${referenceAudioBase64}`
+            "url": `data:audio/webm;base64,${referenceAudioBase64}`
           },
           text.trim(), // ref_text
           text.trim(), // gen_text 
@@ -225,13 +241,13 @@ export async function POST(request: NextRequest) {
         
         const fileRequestData = {
           data: [
-            // ref_audio - 使用文件对象格式
+            // ref_audio - 使用文件对象格式（WebM格式）
             {
-              "path": `audio_${Date.now()}.wav`,
-              "url": `data:audio/wav;base64,${referenceAudioBase64}`,
-              "orig_name": "reference_audio.wav",
+              "path": `audio_${Date.now()}.webm`,
+              "url": `data:audio/webm;base64,${referenceAudioBase64}`,
+              "orig_name": "reference_audio.webm",
               "size": Math.floor(referenceAudioBase64.length * 0.75),
-              "mime_type": "audio/wav"
+              "mime_type": "audio/webm"
             },
             text.trim(), // ref_text
             text.trim(), // gen_text 
