@@ -211,11 +211,11 @@ export async function POST(request: NextRequest) {
       // 根据截图显示的cURL命令，使用FileData格式
       const requestData = {
         data: [
-          // ref_audio - 使用FileData格式（正确的WebM格式）
+          // ref_audio - 使用FileData格式（WAV格式）
           {
-            "path": "reference_audio.webm",
+            "path": "reference_audio.wav",
             "meta": {"_type": "gradio.FileData"},
-            "url": `data:audio/webm;base64,${referenceAudioBase64}`
+            "url": `data:audio/wav;base64,${referenceAudioBase64}`
           },
           text.trim(), // ref_text
           text.trim(), // gen_text 
@@ -241,13 +241,13 @@ export async function POST(request: NextRequest) {
         
         const fileRequestData = {
           data: [
-            // ref_audio - 使用文件对象格式（WebM格式）
+            // ref_audio - 使用文件对象格式（WAV格式）
             {
-              "path": `audio_${Date.now()}.webm`,
-              "url": `data:audio/webm;base64,${referenceAudioBase64}`,
-              "orig_name": "reference_audio.webm",
+              "path": `audio_${Date.now()}.wav`,
+              "url": `data:audio/wav;base64,${referenceAudioBase64}`,
+              "orig_name": "reference_audio.wav",
               "size": Math.floor(referenceAudioBase64.length * 0.75),
-              "mime_type": "audio/webm"
+              "mime_type": "audio/wav"
             },
             text.trim(), // ref_text
             text.trim(), // gen_text 

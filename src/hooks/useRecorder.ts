@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { RecordingState, RecordingStatus } from '@/types';
+import { AudioConverter } from '@/utils/audio-converter';
 
 export const useRecorder = () => {
   const [recordingState, setRecordingState] = useState<RecordingState>({
@@ -36,12 +37,21 @@ export const useRecorder = () => {
       stream.current = mediaStream;
       chunks.current = [];
 
-      // 创建 MediaRecorder
-      const recorder = new MediaRecorder(mediaStream, {
-        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : 'audio/webm',
-      });
+      // 创建 MediaRecorder - 优先尝试 WAV 格式
+      let mimeType = 'audio/webm'; // 默认格式
+      
+      // 尝试找到最佳支持的格式
+      if (AudioConverter.isFormatSupported('audio/wav')) {
+        mimeType = 'audio/wav';
+      } else if (AudioConverter.isFormatSupported('audio/webm;codecs=pcm')) {
+        mimeType = 'audio/webm;codecs=pcm';
+      } else if (AudioConverter.isFormatSupported('audio/webm;codecs=opus')) {
+        mimeType = 'audio/webm;codecs=opus';
+      }
+      
+      console.log('使用的录音格式:', mimeType);
+      
+      const recorder = new MediaRecorder(mediaStream, { mimeType });
 
       mediaRecorder.current = recorder;
 
@@ -51,14 +61,29 @@ export const useRecorder = () => {
         }
       };
 
-      recorder.onstop = () => {
-        const blob = new Blob(chunks.current, { 
-          type: chunks.current[0]?.type || 'audio/webm' 
+      recorder.onstop = async () => {
+        const originalBlob = new Blob(chunks.current, { 
+          type: chunks.current[0]?.type || mimeType 
         });
+        
+        let finalBlob = originalBlob;
+        
+        try {
+          // 如果不是 WAV 格式，则转换为 WAV
+          if (!originalBlob.type.includes('wav')) {
+            console.log('正在转换音频为 WAV 格式...');
+            finalBlob = await AudioConverter.convertToWav(originalBlob);
+            console.log('音频转换完成');
+          }
+        } catch (conversionError) {
+          console.error('音频转换失败:', conversionError);
+          // 如果转换失败，使用原始音频
+          finalBlob = originalBlob;
+        }
         
         setRecordingState(prev => ({
           ...prev,
-          recordedBlob: blob,
+          recordedBlob: finalBlob,
           isRecording: false,
           isProcessing: false,
         }));
@@ -158,7 +183,7 @@ export const useRecorder = () => {
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result as string;
-        // 移除 data:audio/webm;base64, 前缀
+        // 移除 data:audio/wav;base64, 或其他格式的前缀
         const base64 = result.split(',')[1];
         resolve(base64);
       };
