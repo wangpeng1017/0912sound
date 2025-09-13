@@ -163,12 +163,26 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { text, referenceAudioBase64 } = body;
 
-    if (!text || !referenceAudioBase64) {
-      return NextResponse.json(
-        { error: '缺少必要参数' },
-        { status: 400 }
-      );
-    }
+  if (!text || !referenceAudioBase64) {
+    return NextResponse.json(
+      { error: '缺少必要参数' },
+      { status: 400 }
+    );
+  }
+
+  // Demo模式：返回示例音频数据
+  if (process.env.DEMO_MODE === 'true' || text.toLowerCase().includes('demo')) {
+    console.log('Demo模式激活，返回示例音频');
+    
+    // 返回一个小的WAV文件的Base64编码（约1秒的静音）
+    const demoAudio = 'UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmUfCkaV2PHEeycFJHfH8N2QQAoUXrTp66hVFApGn+DyvmUfCk';
+    
+    return NextResponse.json({ 
+      audio: demoAudio,
+      demo: true,
+      message: `Demo模式 - 模拟生成: "${text}"`
+    });
+  }
 
     try {
       // 根据Gradio JavaScript客户端文档，使用正确的API格式
