@@ -8,7 +8,9 @@ export class AudioConverter {
    */
   static async convertToWav(audioBlob: Blob, sampleRate: number = 44100): Promise<Blob> {
     const arrayBuffer = await audioBlob.arrayBuffer();
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    // 创建AudioContext，兼容Safari的webkitAudioContext
+    const AudioContextConstructor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const audioContext = new AudioContextConstructor();
     
     try {
       // 解码音频数据
