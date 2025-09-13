@@ -265,17 +265,6 @@ export async function POST(request: NextRequest) {
         return await handleGradioResponse(responseText, HF_SPACE_URL, HF_TOKEN);
       }
 
-      console.log('Gradio 请求数据格式:', JSON.stringify(requestData, null, 2));
-
-      const response = await fetch(gradioApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${HF_TOKEN}`,
-        },
-        body: JSON.stringify(requestData),
-      });
-
       // 如果都失败，返回错误信息
       const responseText = await response.text();
       console.error('Gradio API 错误:', response.status, response.statusText);
