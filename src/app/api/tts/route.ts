@@ -46,23 +46,21 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // 根据 Gradio 文档，对于 Hugging Face Space，需要使用特定的 API 格式
-      const gradioApiUrl = `${HF_SPACE_URL}/api/predict`;
+      // 根据 Gradio 文档，需要使用正确的 API 端点
+      // Gradio Space 的 API 端点通常在 '/run/predict' 或特定的函数名
+      let gradioApiUrl = `${HF_SPACE_URL}/run/predict`;
       
       console.log('调用 Gradio API:', gradioApiUrl);
       console.log('参数:', { textLength: text.length, audioLength: referenceAudioBase64.length });
       
-      // 根据 Gradio 的 HTTP API 文档，需要使用 data 数组格式
-      // F5-TTS 应用的参数顺序：[reference_audio, reference_text, generate_text, remove_silence]
+      // 尝试第一种格式：直接提交到 /run/predict
       const requestData = {
         data: [
-          {
-            name: "reference_audio.wav",
-            data: `data:audio/wav;base64,${referenceAudioBase64}`
-          },
-          text.trim(), // reference text
-          text.trim(), // generation text  
-          false // remove silence
+          // reference_audio - 文件数据格式
+          `data:audio/wav;base64,${referenceAudioBase64}`,
+          text.trim(), // reference_text
+          text.trim(), // gen_text 
+          false // remove_silence
         ]
       };
 
@@ -83,6 +81,60 @@ export async function POST(request: NextRequest) {
       console.log('Gradio API 响应内容:', responseText);
 
       if (!response.ok) {
+        // 如果是 404，尝试其他端点
+        if (response.status === 404) {
+          console.log('尝试备用 API 端点');
+          // 尝试不同的端点格式
+          const altEndpoints = [
+            `${HF_SPACE_URL}/api/predict`,
+            `${HF_SPACE_URL}/call/predict`, 
+            `${HF_SPACE_URL}/gradio_api/run/predict`
+          ];
+          
+          for (const altUrl of altEndpoints) {
+            try {
+              console.log('尝试端点:', altUrl);
+              const altResponse = await fetch(altUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${HF_TOKEN}`,
+                },
+                body: JSON.stringify(requestData),
+              });
+              
+              if (altResponse.ok) {
+                const altResponseText = await altResponse.text();
+                console.log('备用端点成功响应:', altResponseText);
+                
+                try {
+                  const altResult = JSON.parse(altResponseText);
+                  if (altResult.data && altResult.data.length > 0) {
+                    const audioResult = altResult.data[0];
+                    if (typeof audioResult === 'string') {
+                      let audioData = audioResult;
+                      
+                      if (audioData.startsWith('data:')) {
+                        audioData = audioData.split(',')[1];
+                      } else if (audioData.startsWith('http')) {
+                        const audioResponse = await fetch(audioData);
+                        const audioBuffer = await audioResponse.arrayBuffer();
+                        audioData = Buffer.from(audioBuffer).toString('base64');
+                      }
+                      
+                      return NextResponse.json({ audio: audioData });
+                    }
+                  }
+                } catch (parseError) {
+                  console.error('解析备用响应失败:', parseError);
+                }
+              }
+            } catch (altError) {
+              console.error(`端点 ${altUrl} 调用失败:`, altError);
+            }
+          }
+        }
+        
         console.error('Gradio API 错误:', response.status, response.statusText);
         console.error('错误详情:', responseText);
         
@@ -91,6 +143,9 @@ export async function POST(request: NextRequest) {
         switch (response.status) {
           case 401:
             errorMessage = 'API 认证失败，请检查令牌';
+            break;
+          case 404:
+            errorMessage = 'API 端点未找到，该服务可能暂时不可用';
             break;
           case 422:
             errorMessage = '请求参数错误，请检查音频格式和文本内容';
