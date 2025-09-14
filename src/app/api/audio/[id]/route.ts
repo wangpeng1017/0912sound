@@ -16,11 +16,12 @@ const cleanupExpired = () => {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   cleanupExpired();
+  const { id } = await context.params;
   
-  const audioData = audioStore.get(params.id);
+  const audioData = audioStore.get(id);
   
   if (!audioData) {
     return NextResponse.json({ error: 'Audio not found' }, { status: 404 });
