@@ -172,8 +172,11 @@ async function uploadAudioAndGetUrl(base64Audio: string): Promise<string> {
       fd.append('file', blob, 'audio.wav');
       const res = await fetch('https://file.io', { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`file.io upload failed: ${res.status}`);
-      const data = await res.json();
-      const link = (data as any)?.link as string | undefined;
+      const data: unknown = await res.json();
+      // 类型安全地读取 `link` 字段
+      const link = typeof (data as { link?: unknown }).link === 'string'
+        ? (data as { link?: unknown }).link as string
+        : undefined;
       if (!link) throw new Error('file.io response missing link');
       return link;
     },

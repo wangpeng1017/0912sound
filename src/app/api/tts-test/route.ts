@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // 测试路由 - 使用官方示例音频
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const HF_SPACE_URL = process.env.NEXT_PUBLIC_HF_SPACE_URL || 'https://wangpe-2e2-f5-tts.hf.space';
     const HF_TOKEN = process.env.HF_TOKEN;
