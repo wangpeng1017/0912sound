@@ -285,33 +285,13 @@ export async function POST(request: NextRequest) {
   }
 
     try {
-      // 步骤1: 使用新的上传服务
-      console.log('步骤1: 上传音频到可靠存储');
+      // 暂时跳过上传，直接使用GitHub上的示例音频测试
+      console.log('使用GitHub示例音频测试F5-TTS');
       
-      const baseUrl = request.headers.get('origin') || 
-                      `https://${request.headers.get('host')}`;
+      // 使用已知可工作的GitHub URL
+      const audioUrl = 'https://github.com/gradio-app/gradio/raw/main/test/test_files/audio_sample.wav';
       
-      const uploadResponse = await fetch(`${baseUrl}/api/upload-audio`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioBase64: referenceAudioBase64 })
-      });
-      
-      if (!uploadResponse.ok) {
-        const error = await uploadResponse.json();
-        console.error('音频上传失败:', error);
-        return NextResponse.json(
-          { error: '音频处理失败，请稍后重试' },
-          { status: 500 }
-        );
-      }
-      
-      const { url: audioUrl, provider, warning } = await uploadResponse.json();
-      console.log(`音频URL (${provider}):`, audioUrl);
-      
-      if (warning) {
-        console.warn(warning);
-      }
+      console.log('音频URL (测试):', audioUrl);
       
       // 步骤2: 调用Gradio API
       const gradioApiUrl = `${HF_SPACE_URL}/gradio_api/call/predict`;
