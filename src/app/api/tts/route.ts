@@ -161,11 +161,15 @@ async function uploadAudioAndGetUrl(base64Audio: string): Promise<string> {
       fd.append('file', blob, 'audio.wav');
       const res = await fetch('https://tmpfiles.org/api/v1/upload', { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`tmpfiles upload failed: ${res.status}`);
-      const data = await res.json();
-      const raw = data?.data?.url as string | undefined;
+      const data: unknown = await res.json();
+      const raw = (data as { data?: { url?: string } })?.data?.url;
       if (!raw) throw new Error('tmpfiles response missing url');
-      // 转换为直链下载地址
-      return raw.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+      // 标准化为 HTTPS 并生成直链 https://tmpfiles.org/dl/<id>
+      const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+      const segments = u.pathname.split('/').filter(Boolean);
+      const id = segments[0];
+      if (!id) throw new Error('tmpfiles url missing id segment');
+      return `https://tmpfiles.org/dl/${id}`;
     },
     async () => {
       const fd = new FormData();
@@ -173,12 +177,13 @@ async function uploadAudioAndGetUrl(base64Audio: string): Promise<string> {
       const res = await fetch('https://file.io', { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`file.io upload failed: ${res.status}`);
       const data: unknown = await res.json();
-      // 类型安全地读取 `link` 字段
-      const link = typeof (data as { link?: unknown }).link === 'string'
+      // 类型安全地读取 `link` 字段，并强制 https
+      const rawLink = typeof (data as { link?: unknown }).link === 'string'
         ? (data as { link?: unknown }).link as string
         : undefined;
-      if (!link) throw new Error('file.io response missing link');
-      return link;
+      if (!rawLink) throw new Error('file.io response missing link');
+      const httpsLink = rawLink.startsWith('http://') ? rawLink.replace('http://', 'https://') : rawLink;
+      return httpsLink;
     },
   ];
 
