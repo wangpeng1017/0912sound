@@ -148,6 +148,49 @@ async function handleGradioResponse(responseText: string, spaceUrl: string, toke
   );
 }
 
+// 辅助：将base64音频上传到临时文件服务，返回可公开访问的URL
+async function uploadAudioAndGetUrl(base64Audio: string): Promise<string> {
+  // 将base64转换为Blob（WAV）
+  const buffer = Buffer.from(base64Audio, 'base64');
+  const blob = new Blob([buffer], { type: 'audio/wav' });
+
+  // 依次尝试多个免费临时文件服务
+  const tryUploaders: Array<() => Promise<string>> = [
+    async () => {
+      const fd = new FormData();
+      fd.append('file', blob, 'audio.wav');
+      const res = await fetch('https://tmpfiles.org/api/v1/upload', { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(`tmpfiles upload failed: ${res.status}`);
+      const data = await res.json();
+      const raw = data?.data?.url as string | undefined;
+      if (!raw) throw new Error('tmpfiles response missing url');
+      // 转换为直链下载地址
+      return raw.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+    },
+    async () => {
+      const fd = new FormData();
+      fd.append('file', blob, 'audio.wav');
+      const res = await fetch('https://file.io', { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(`file.io upload failed: ${res.status}`);
+      const data = await res.json();
+      const link = (data as any)?.link as string | undefined;
+      if (!link) throw new Error('file.io response missing link');
+      return link;
+    },
+  ];
+
+  let lastErr: unknown;
+  for (const fn of tryUploaders) {
+    try {
+      const url = await fn();
+      return url;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('Unknown upload error');
+}
+
 export async function POST(request: NextRequest) {
   try {
     // 验证环境变量
@@ -208,26 +251,15 @@ export async function POST(request: NextRequest) {
   }
 
     try {
-      // 首先将音频上传到我们的服务器获取URL
-      const baseUrl = request.headers.get('origin') || 
-                      `https://${request.headers.get('host')}`;
-      
-      console.log('步骤1: 上传音频到临时存储');
-      const audioUploadResponse = await fetch(`${baseUrl}/api/audio`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioBase64: referenceAudioBase64 })
-      });
-      
-      if (!audioUploadResponse.ok) {
-        console.error('音频上传失败');
-        return NextResponse.json(
-          { error: '音频处理失败' },
-          { status: 500 }
-        );
+      // 将音频上传到外部临时文件服务，获得公开URL（避免无状态函数内存丢失问题）
+      console.log('步骤1: 上传音频到外部临时文件服务');
+      let audioUrl: string;
+      try {
+        audioUrl = await uploadAudioAndGetUrl(referenceAudioBase64);
+      } catch (uploadErr) {
+        console.error('音频上传失败:', uploadErr);
+        return NextResponse.json({ error: '音频上传失败，请稍后重试' }, { status: 502 });
       }
-      
-      const { url: audioUrl } = await audioUploadResponse.json();
       console.log('音频URL:', audioUrl);
       
       // 步骤2: 调用Gradio API
@@ -262,38 +294,19 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify(requestData),
       });
       
-      // 如果第一次失败，尝试使用文件对象格式
+      // 仅当端点不存在才会尝试备用，但仍使用URL而非data URL
       if (!response.ok && response.status === 404) {
-        console.log('尝试文件对象格式');
-        
-        const fileRequestData = {
-          data: [
-            // ref_audio - 使用FileData对象格式（备用）
-            {
-              "path": `data:audio/wav;base64,${referenceAudioBase64}`,
-              "meta": {"_type": "gradio.FileData"}
-            },
-            text.trim(), // ref_text
-            text.trim(), // gen_text 
-            true // remove_silence
-          ]
-        };
-        
-        const fileResponse = await fetch(gradioApiUrl, {
+        console.log('端点返回404，重试一次');
+        const retryResponse = await fetch(gradioApiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${HF_TOKEN}`,
           },
-          body: JSON.stringify(fileRequestData),
+          body: JSON.stringify(requestData),
         });
-        
-        if (fileResponse.ok) {
-          // 如果文件格式成功，使用这个响应
-          const responseText = await fileResponse.text();
-          console.log('文件格式成功响应:', responseText);
-          
-          // 继续处理响应...
+        if (retryResponse.ok) {
+          const responseText = await retryResponse.text();
           return await handleGradioResponse(responseText, HF_SPACE_URL, HF_TOKEN);
         }
       }
