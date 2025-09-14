@@ -2,7 +2,13 @@
 
 ## 问题诊断
 
-经过深入调试，发现 **tmpfiles.org 等临时文件服务无法被 Hugging Face Space 访问**，导致 F5-TTS 返回 404 错误。
+经过深入调试，发现以下问题：
+
+1. **tmpfiles.org** - F5-TTS 无法访问（404错误）
+2. **Vercel Blob Storage** - F5-TTS 无法访问（404错误）
+3. **GitHub URL** - 可以正常工作
+
+**结论**: F5-TTS 只能访问特定的域名（如 GitHub）
 
 ## 解决方案：使用 Vercel Blob Storage
 
