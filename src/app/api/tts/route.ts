@@ -259,16 +259,33 @@ export async function POST(request: NextRequest) {
   }
 
     try {
-      // 将音频上传到外部临时文件服务，获得公开URL（避免无状态函数内存丢失问题）
-      console.log('步骤1: 上传音频到外部临时文件服务');
-      let audioUrl: string;
-      try {
-        audioUrl = await uploadAudioAndGetUrl(referenceAudioBase64);
-      } catch (uploadErr) {
-        console.error('音频上传失败:', uploadErr);
-        return NextResponse.json({ error: '音频上传失败，请稍后重试' }, { status: 502 });
+      // 步骤1: 使用新的上传服务
+      console.log('步骤1: 上传音频到可靠存储');
+      
+      const baseUrl = request.headers.get('origin') || 
+                      `https://${request.headers.get('host')}`;
+      
+      const uploadResponse = await fetch(`${baseUrl}/api/upload-audio`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioBase64: referenceAudioBase64 })
+      });
+      
+      if (!uploadResponse.ok) {
+        const error = await uploadResponse.json();
+        console.error('音频上传失败:', error);
+        return NextResponse.json(
+          { error: '音频处理失败，请稍后重试' },
+          { status: 500 }
+        );
       }
-      console.log('音频URL:', audioUrl);
+      
+      const { url: audioUrl, provider, warning } = await uploadResponse.json();
+      console.log(`音频URL (${provider}):`, audioUrl);
+      
+      if (warning) {
+        console.warn(warning);
+      }
       
       // 步骤2: 调用Gradio API
       const gradioApiUrl = `${HF_SPACE_URL}/gradio_api/call/predict`;
