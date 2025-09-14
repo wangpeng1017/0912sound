@@ -279,9 +279,13 @@ export async function POST(request: NextRequest) {
       // 使用与官方完全相同的格式，但使用我们的URL
       const requestData = {
         data: [
-          // ref_audio - 使用FileData对象格式和HTTP URL
+          // ref_audio - 使用FileData对象格式和HTTP URL，补充元数据以提高兼容性
           {
             "path": audioUrl,
+            "orig_name": "reference_audio.wav",
+            "mime_type": "audio/wav",
+            "size": null,
+            "is_stream": false,
             "meta": {"_type": "gradio.FileData"}
           },
           text.trim(), // ref_text
@@ -354,8 +358,16 @@ export async function POST(request: NextRequest) {
           break;
       }
 
+      // 附加更多诊断信息，帮助定位失败原因
       return NextResponse.json(
-        { error: errorMessage, details: responseText },
+        { 
+          error: errorMessage, 
+          details: responseText,
+          debug: {
+            requestData,
+            gradioApiUrl
+          }
+        },
         { status: response.status }
       );
       
