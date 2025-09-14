@@ -35,7 +35,10 @@ async function handleGradioResponse(responseText: string, spaceUrl: string, toke
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
+            'Accept': 'text/event-stream',
           },
+          // 添加超时设置
+          signal: AbortSignal.timeout(20000), // 20秒超时
         });
         
         if (!eventResponse.ok) {
@@ -45,13 +48,25 @@ async function handleGradioResponse(responseText: string, spaceUrl: string, toke
         }
         
         const eventData = await eventResponse.text();
-        console.log('轮询响应:', eventData);
+        console.log(`轮询响应 (${i + 1}/${maxRetries}):`, eventData.substring(0, 500)); // 只显示前500字符
         
         // 检查是否有错误
         if (eventData.includes('event: error')) {
-          console.error('Gradio API 返回错误:', eventData);
+          // 提取错误信息
+          const errorMatch = eventData.match(/data: "?([^"\n]+)"?/);
+          const errorMsg = errorMatch ? errorMatch[1] : '未知错误';
+          console.error('Gradio API 返回错误:', errorMsg);
+          
+          // 如果是404，可能是音频无法访问
+          if (errorMsg.includes('404')) {
+            return NextResponse.json(
+              { error: 'F5-TTS 无法访问音频文件，请稍后重试' },
+              { status: 502 }
+            );
+          }
+          
           return NextResponse.json(
-            { error: 'TTS 服务处理请求时出现错误，请检查音频格式或稍后重试' },
+            { error: `TTS 处理失败: ${errorMsg}` },
             { status: 500 }
           );
         }
@@ -94,9 +109,20 @@ async function handleGradioResponse(responseText: string, spaceUrl: string, toke
           }
         }
         
+        // 如果没有完成也没有错误，检查是否有heartbeat
+        if (eventData.includes('event: heartbeat')) {
+          console.log(`Heartbeat 接收，继续等待...`);
+        }
+        
         await new Promise(resolve => setTimeout(resolve, 1000)); // 等待 1 秒
       } catch (eventError) {
         console.error('轮询事件失败:', eventError);
+        
+        // 如果是超时错误，继续重试
+        if (eventError instanceof Error && eventError.name === 'AbortError') {
+          console.log('轮询超时，继续重试...');
+        }
+        
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
