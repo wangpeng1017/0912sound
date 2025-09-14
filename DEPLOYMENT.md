@@ -4,32 +4,43 @@
 
 经过深入调试，发现 **tmpfiles.org 等临时文件服务无法被 Hugging Face Space 访问**，导致 F5-TTS 返回 404 错误。
 
-## 解决方案
+## 解决方案：使用 Vercel Blob Storage
 
-### 方案1：使用 Cloudinary（推荐）
+本项目现在使用 **Vercel Blob Storage** 作为音频存储解决方案。这是 Vercel 官方提供的存储服务，与 Vercel 部署完美集成。
 
-1. 注册免费 Cloudinary 账户：https://cloudinary.com
-2. 获取你的凭证（在 Dashboard 中）
-3. 在 Vercel 环境变量中添加：
+### 配置步骤
+
+1. **启用 Blob Storage**
+   - 登录 [Vercel Dashboard](https://vercel.com/dashboard)
+   - 进入您的项目
+   - 点击 "Storage" 选项卡
+   - 创建新的 Blob Store
+   - 连接到您的项目
+
+2. **设置环境变量**
+   
+   Vercel 会自动添加 `BLOB_READ_WRITE_TOKEN`，但您还需要添加：
+   
    ```
-   CLOUDINARY_CLOUD_NAME=你的cloud_name
-   CLOUDINARY_API_KEY=你的api_key
-   CLOUDINARY_API_SECRET=你的api_secret
+   HF_TOKEN=您的_hugging_face_token
+   NEXT_PUBLIC_HF_SPACE_URL=https://wangpe-2e2-f5-tts.hf.space
    ```
 
-### 方案2：使用 GitHub Gist
-
-1. 创建 GitHub Personal Access Token
-   - 访问：https://github.com/settings/tokens
-   - 生成新令牌，勾选 `gist` 权限
-2. 在 Vercel 环境变量中添加：
+3. **本地开发**
+   
+   创建 `.env.local` 文件（不会上传到 GitHub）：
    ```
-   GITHUB_TOKEN=你的github_token
+   BLOB_READ_WRITE_TOKEN="您的_blob_token"
+   HF_TOKEN="您的_hf_token"
+   NEXT_PUBLIC_HF_SPACE_URL="https://wangpe-2e2-f5-tts.hf.space"
    ```
 
-### 方案3：临时测试
+### 优势
 
-如果不配置上述服务，系统会使用示例音频进行测试，但无法使用真实的语音克隆功能。
+- **免费额度**：5GB 存储空间
+- **完美集成**：与 Vercel 部署无缝集成
+- **高性能**：全球 CDN 加速
+- **简单配置**：无需第三方服务
 
 ## 其他环境变量
 
